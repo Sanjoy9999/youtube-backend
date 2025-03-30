@@ -2,3 +2,28 @@ https://app.eraser.io/workspace/x6eC54utm3Mvi6zXaT5H
 
 
 .gitignore generator
+
+
+
+
+Frontend Design
+
+https://www.figma.com/design/shmxWL5FKRO5GNOPPopBg6/PLAY?node-id=0-1&p=f&t=MbYAg3cuafGahsEp-0
+
+
+
+
+
+Frontend Design copy figma link
+
+https://www.figma.com/design/0Uw2s9A4o7PMFpeY9amVLZ/PLAY-(Copy)?node-id=0-1&p=f&t=xmxBwqqlB4A4hTiy-0
+
+
+
+
+MongoDB client
+
+UI Software name is Studio T3 
+
+
+

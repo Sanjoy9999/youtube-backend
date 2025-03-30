@@ -273,7 +273,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     throw new ApiError(400, "All fields are required");
   }
 
-  const user = User.findByIdAndUpdate(
+  const user = await  User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
@@ -299,6 +299,9 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
       throw new ApiError(400,"Avatar file is missing")
    }
 
+   //TODO: delete old image - assignment after new avar image upload
+
+
    const avatar = await uploadOnCloudinary(avatarLocalPath)
 
    if (!avatar.url) {
@@ -322,6 +325,63 @@ const updateUserAvatar = asyncHandler(async(req,res)=>{
     new ApiResponse(200,user,"Avatar image updated successfully")
    )
 })
+
+
+
+//TODO: delete old image - assignment after new avar image upload
+//for deletion todo above function instead blow to function 
+
+
+
+// const updateUserAvatar = asyncHandler(async (req, res) => {
+//   if (!req.file) {
+//       throw new ApiError(400, "Avatar file is missing");
+//   }
+
+//   const avatarLocalPath = req.file.path;
+
+//   // Retrieve existing user to check old avatar
+//   const existingUser = await User.findById(req.user?._id);
+//   if (!existingUser) {
+//       throw new ApiError(404, "User not found");
+//   }
+
+//   try {
+//       // Upload new avatar to Cloudinary
+//       const avatar = await uploadOnCloudinary(avatarLocalPath);
+//       if (!avatar?.url) {
+//           throw new ApiError(400, "Error while uploading avatar");
+//       }
+
+//       // Delete old avatar from Cloudinary (if it exists)
+//       if (existingUser.avatar) {
+//           await deleteFromCloudinary(existingUser.avatar);
+//       }
+
+//       // Update database with new avatar URL
+//       existingUser.avatar = avatar.url;
+//       await existingUser.save(); // Automatically updates the database
+
+//       return res.status(200).json(
+//           new ApiResponse(200, existingUser, "Avatar image updated successfully")
+//       );
+
+//   } catch (error) {
+//       throw new ApiError(500, "Server error while updating avatar");
+//   }
+// });
+
+
+
+// const deleteFromCloudinary = async (imageUrl) => {
+//   if (!imageUrl) return;
+
+//   // Extract publicId from the Cloudinary image URL
+//   const publicId = imageUrl.split("/").pop().split(".")[0]; 
+//   await cloudinary.uploader.destroy(publicId);
+// };
+
+
 
 
 const updateUserCoverImage = asyncHandler(async(req,res)=>{
@@ -358,6 +418,75 @@ const updateUserCoverImage = asyncHandler(async(req,res)=>{
 
 
 
+const getUserChannelProfile = asyncHandler(async (req,res)=>{
+   const {username} =  req.params 
+
+   if (!username?.trim()) {
+      throw new ApiError(400,"username is missing")
+   }
+
+ const channel =  await User.aggregate([
+  {
+     $match: {
+      username: username?.toLowerCase()
+     }
+  },{
+    $lookup: {
+       from: "subscriptions",
+       localField: "_id",
+       foreignField: "channel",
+       as: "subscribers"
+    }
+  },
+  {
+     $lookup: {
+      from: "subscriptions",
+      localField: "_id",
+      foreignField: "subscriber",
+      as: "subscribedTo"
+     }
+  },
+  {
+    $addFields: {
+       subscribersCount:{
+        $size: "$subscribers"
+       },
+       channelsSubscribedToCount: {
+           $size: "subscribedTo"
+       },
+       isSubscribed: {
+        if: {$in: [req.user?._id,"$subscribers.subscriber"]},
+        then: true,
+        else: false    
+       }
+    }
+  },{
+     $project: {
+       fullName: 1,
+       username: 1,
+       subscribersCount: 1,  
+       channelsSubscribedToCount: 1,
+       isSubscribed: 1,
+       avatar: 1,
+       coverImage: 1,
+       email: 1  
+     }
+  }
+
+ ])
+
+
+ if (!channel?.length) {
+    throw new ApiError(404,"channel does not exists")
+ }
+
+ return res
+ .status(200)
+ .json(
+  new ApiResponse(200,channel[0],"User Channel fetched successfully")
+ )
+})
+
 
 export {
   registerUser,
@@ -368,5 +497,6 @@ export {
   getCurrentUser,
   updateAccountDetails,
   updateUserAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
+  getUserChannelProfile 
 };
