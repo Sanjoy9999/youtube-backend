@@ -26,4 +26,12 @@ MongoDB client
 UI Software name is Studio T3 
 
 
+Step work 
+
+user.model --> user.controller -> Router then import --> app.js
+
+
+Assignment:
+
+1) 
 
