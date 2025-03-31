@@ -1,9 +1,12 @@
+import mongoose from "mongoose"
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -36,6 +39,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const { fullName, email, username, password } = req.body;
   // console.log("email",email);
+  console.log("Received request body:", req.body);
+
 
   if (
     [fullName, email, username, password].some((field) => field?.trim() === "")
@@ -169,8 +174,8 @@ const logoutUser = asyncHandler(async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined,
+      $unset: {
+        refreshToken: 1 //this removes the field from document
       },
     },
     {
@@ -241,20 +246,38 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 const changeCurrentPassword = asyncHandler(async (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
-  const user = await User.findById(req.user?._id);
-  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  //  Validate request body
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "Both old and new passwords are required");
+  }
 
+  //  Find user and ensure password field is selected
+  const user = await User.findById(req.user?._id).select("+password");
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  //  Ensure user has a password set
+  if (!user.password) {
+    throw new ApiError(500, "User password is missing in the database");
+  }
+
+  //  Compare old password
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
   if (!isPasswordCorrect) {
     throw new ApiError(400, "Invalid old password");
   }
 
-  user.password = newPassword;
-  await user.save({ validateBeforeSave: false });
+  //  Hash the new password before saving
+  user.password = await bcrypt.hash(newPassword, 10);
+  await user.save();  //  Do not disable validation
 
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password changed successfully"));
 });
+
 
 
 
@@ -452,12 +475,14 @@ const getUserChannelProfile = asyncHandler(async (req,res)=>{
         $size: "$subscribers"
        },
        channelsSubscribedToCount: {
-           $size: "subscribedTo"
+           $size: "$subscribedTo"
        },
        isSubscribed: {
-        if: {$in: [req.user?._id,"$subscribers.subscriber"]},
-        then: true,
-        else: false    
+        $cond: {
+          if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+          then: true,
+          else: false
+        }   
        }
     }
   },{
@@ -511,7 +536,7 @@ const getWatchHistory = asyncHandler(async (req,res) => {
               as: "owner",
               pipeline: [
                 {
-                  $projects:{
+                  $project:{
                     fullName: 1,
                     username: 1,
                     avatar: 1
